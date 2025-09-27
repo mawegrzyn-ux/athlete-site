@@ -11,24 +11,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare rsync/ssh
+      - name: Prepare SSH key and known_hosts
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          # strip CRLFs just in case the secret was pasted with Windows newlines
+          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Smoke test SSH (prove we can connect)
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo CONNECTED && whoami && uname -a"
+
+      - name: Ensure remote path exists and ownership is correct
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            mkdir -p ${{ secrets.REMOTE_PATH }} && \
+            chmod 755 $(dirname ${{ secrets.REMOTE_PATH }}) && \
+            chmod 755 ${{ secrets.REMOTE_PATH }}"
+
       - name: Rsync repo to server
         run: |
-          rsync -avzr --delete --exclude '.git' -e "ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes" ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.REMOTE_PATH }}
-      - name: Install & restart on server
+          rsync -avzr --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'node_modules' \
+            -e 'ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes' \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.REMOTE_PATH }}/
+
+      - name: Install, build, and restart via PM2
         run: |
           ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            set -euo pipefail
             cd ${{ secrets.REMOTE_PATH }}
-            # install deps (production only)
+            # production install + standalone start
             npm ci --omit=dev
             npm run build
-            # start/reload with pm2
-            pm2 describe athlete >/dev/null 2>&1 && pm2 reload athlete || pm2 start "npm start" --name athlete
+            pm2 describe athlete >/dev/null 2>&1 && \
+              pm2 reload athlete || pm2 start "node .next/standalone/server.js" --name athlete
             pm2 save
           EOF
