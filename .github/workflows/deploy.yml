@@ -48,15 +48,22 @@ jobs:
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.REMOTE_PATH }}/
 
       # 5) Install, build, and (re)start with PM2 using Next.js standalone
-      - name: Build and restart
+      - name: Build and restart (PM2)
         run: |
           ssh -i ~/.ssh/id_actions -o StrictHostKeyChecking=yes ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             set -euo pipefail
             cd ${{ secrets.REMOTE_PATH }}
-            # You already created .env on the server; it's not synced from CI.
-            npm ci --omit=dev
+      
+            # Use lockfile if present; otherwise generate one, then install
+            if [ -f package-lock.json ]; then
+              npm ci --omit=dev
+            else
+              npm install --package-lock-only
+              npm install --omit=dev
+            fi
+      
             npm run build
-            # Start/reload the standalone server.js
+      
             if pm2 describe athlete >/dev/null 2>&1; then
               pm2 reload athlete
             else
