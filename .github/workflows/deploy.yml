@@ -14,14 +14,15 @@ jobs:
       - name: Prepare SSH key and known_hosts
         run: |
           mkdir -p ~/.ssh
-          # strip CRLFs just in case the secret was pasted with Windows newlines
-          echo "${{ secrets.SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
+          echo "${{ secrets.SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_actions
+          chmod 600 ~/.ssh/id_actions
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Smoke test SSH (prove we can connect)
+      
+      - name: Smoke test SSH
         run: |
-          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo CONNECTED && whoami && uname -a"
+          ssh -i ~/.ssh/id_actions -o StrictHostKeyChecking=yes \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo CONNECTED && whoami && uname -a"
+
 
       - name: Ensure remote path exists and ownership is correct
         run: |
