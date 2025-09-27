@@ -1,14 +1,21 @@
-import './globals.css'
+// app/layout.tsx
+import type { Metadata } from "next";
+import "./globals.css";
 
-export const metadata = {
-  title: 'Athlete Site',
-  description: 'Profile site for a sportsperson',
-}
+export const metadata: Metadata = {
+  title: "Athlete Site",
+  description: "Profile site for a sportsperson",
+};
 
-export default function RootLayout({ children }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50 text-gray-900">{children}</body>
     </html>
-  )
+  );
 }
+
