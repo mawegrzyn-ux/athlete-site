@@ -35,7 +35,12 @@ jobs:
               mkdir -p ${{ secrets.REMOTE_PATH }} && \
               chmod 755 $(dirname ${{ secrets.REMOTE_PATH }}) && \
               chmod 755 ${{ secrets.REMOTE_PATH }}"
-
+      # 4 -1) Show layout 
+      - name: Show layout.tsx (sanity)
+        run: |
+          echo "--- begin app/layout.tsx ---"
+          nl -ba app/layout.tsx | sed -n '1,80p'
+          echo "--- end app/layout.tsx ---"
       # 4) Sync repo to server (no node_modules, no CI files)
       - name: Rsync repo to server
         run: |
@@ -46,7 +51,13 @@ jobs:
             --exclude '.env' \
             -e 'ssh -i ~/.ssh/id_actions -o StrictHostKeyChecking=yes' \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.REMOTE_PATH }}/
-
+      # 4 +1) show remote layout
+      - name: Show remote layout.tsx (sanity)
+        run: |
+          ssh -i ~/.ssh/id_actions -o StrictHostKeyChecking=yes ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "\
+            echo '--- remote app/layout.tsx ---'; \
+            nl -ba ${{ secrets.REMOTE_PATH }}/app/layout.tsx | sed -n '1,80p'; \
+            echo '--- end ---'"
       # 5) Install, build, and (re)start with PM2 using Next.js standalone
       - name: Build and restart (PM2)
         run: |
